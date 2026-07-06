@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromeOS / 端末環境 判別システム</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #58a6ff;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 30px;
+            text-shadow: 0 0 5px rgba(88, 166, 255, 0.5);
+        }
+        h1 {
+            color: #f0f6fc;
+            border-bottom: 2px solid #21262d;
+            padding-bottom: 10px;
+        }
+        .console-box {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 150px;
+            white-space: pre-wrap;
+        }
+        .btn-scan {
+            background-color: #238636;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .btn-scan:hover {
+            background-color: #2ea043;
+        }
+        .success { color: #7ee787; }
+        .warning { color: #f2cc60; }
+        .danger { color: #ff7b72; }
+    </style>
+</head>
+<body>
+
+    <h1>[SYSTEM] OS & Browser Integrity Check</h1>
+    <p>ブラウザ内部の特殊領域（chrome-untrusted://）へのフェッチ可否による環境の自動判別を行います。</p>
+
+    <button class="btn-scan" onclick="startDetection()">スキャンを開始する</button>
+
+    <div class="console-box" id="output">=== 待機中: スキャンボタンを押してください ===</div>
+
+    <script>
+        async function startDetection() {
+            const output = document.getElementById('output');
+            output.innerHTML = "ユーザーエージェントを分析中...\n";
+            
+            // ターゲットとなる特殊URL（指定された画像URL）
+            const targetUrl = "chrome-untrusted://new-tab-page/custom_background_image?url=https%3A%2F%://googleusercontent.com%2Fproxy%2FxpCEIa8TbIUGee39mYxIxtPBPjIDNQo6GfEjF-FIqt1L2fjNe7WfGLCfsbs4E0lECNsdt0Yt9hQpZZdgd1FXJCIhmce2H2i0hZp0%3Dw3840-h2160-p-k-no-nd-mv";
+            
+            output.innerHTML += `特殊URLへフェッチを試行します:\n[URL] ${targetUrl}\n\n`;
+
+            try {
+                // 特殊URLへのアクセスを試みる（try-catch文でエラーをキャッチする）
+                const response = await fetch(targetUrl);
+                
+                // 万が一、エラーが起きずに応答が帰ってきた場合（通常はセキュリティで弾かれます）
+                output.innerHTML += `<span class="success">成功: 応答が確認されました。本物の内部セッションがアクティブです。</span>\n`;
+                output.innerHTML += `[RESULT] 無改造のChromeOS、または開発環境である可能性が極めて高いです。`;
+
+            } catch (error) {
+                // ここでエラーをキャッチし、その中身を解析する
+                output.innerHTML += `<span class="warning">[CATCH] エラーを検出しました。</span>\n`;
+                output.innerHTML += `エラー内容: ${error.name} - ${error.message}\n\n`;
+
+                // エラーのパターンや、User-Agent（ブラウザの情報）を組み合わせて判定する
+                const isChrome = navigator.userAgent.includes("Chrome");
+                const isCrOS = navigator.userAgent.includes("CrOS"); // ChromeOSの固有文字
+
+                if (isCrOS) {
+                    output.innerHTML += `<span class="success">[判定結果] 本物の Chromebook (ChromeOS) を検出しました。</span>\n`;
+                    output.innerHTML += `理由: 'chrome-untrusted' へのリクエストがOS固有の暗号セキュリティチェーンによって正しくブロックされ、安全な改ざん無しの状態であることが証明されました。`;
+                } else if (isChrome) {
+                    output.innerHTML += `<span class="warning">[判定結果] Windows/Mac等の一般の Chromeブラウザ です。</span>\n`;
+                    output.innerHTML += `理由: ブラウザ自体はChrome系ですが、Chromebook固有のOSシグナル（CrOS）が検出されませんでした。`;
+                } else {
+                    output.innerHTML += `<span class="danger">[判定結果] 非Chrome系（Safari、Firefox、または改造ブラウザ）です。</span>\n`;
+                    output.innerHTML += `理由: 'chrome-untrusted' プロトコル自体が解釈されていないか、想定外の挙動です。`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
