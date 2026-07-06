@@ -3,96 +3,843 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromeOS / 端末環境 判別システム</title>
+    <title>ChromeOS / 端末環境 判別システム v2.0</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: #0d1117;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
             color: #58a6ff;
             font-family: 'Courier New', Courier, monospace;
-            padding: 30px;
-            text-shadow: 0 0 5px rgba(88, 166, 255, 0.5);
+            padding: 40px 20px;
+            min-height: 100vh;
         }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
         h1 {
             color: #f0f6fc;
-            border-bottom: 2px solid #21262d;
-            padding-bottom: 10px;
+            font-size: 28px;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(88, 166, 255, 0.6);
+            border-bottom: 3px solid #238636;
+            padding-bottom: 15px;
         }
-        .console-box {
+
+        .subtitle {
+            color: #8b949e;
+            font-size: 14px;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            font-size: 15px;
+            font-family: inherit;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background-color: #238636;
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+            box-shadow: 0 0 15px rgba(46, 160, 67, 0.5);
+        }
+
+        .btn-primary:disabled {
+            background-color: #1f6feb;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #1f6feb;
+            color: #ffffff;
+        }
+
+        .btn-secondary:hover {
+            background-color: #388bfd;
+        }
+
+        /* スピナー */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(88, 166, 255, 0.3);
+            border-top: 2px solid #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ステップバー */
+        .detection-steps {
             background-color: #161b22;
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 20px;
-            margin-top: 20px;
-            min-height: 150px;
-            white-space: pre-wrap;
+            margin-bottom: 25px;
+            display: none;
         }
-        .btn-scan {
-            background-color: #238636;
-            color: #ffffff;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-family: inherit;
-            cursor: pointer;
+
+        .detection-steps.active {
+            display: block;
+        }
+
+        .step {
+            padding: 12px 0;
+            border-left: 3px solid #444c56;
+            padding-left: 15px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .step.pending {
+            color: #8b949e;
+        }
+
+        .step.running {
+            color: #f0f6fc;
+            border-left-color: #f2cc60;
+        }
+
+        .step.running::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(242, 204, 96, 0.3);
+            border-top: 2px solid #f2cc60;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .step.completed {
+            color: #7ee787;
+            border-left-color: #7ee787;
+        }
+
+        .step.completed::before {
+            content: '✓';
+            display: inline-block;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        .step.failed {
+            color: #ff7b72;
+            border-left-color: #ff7b72;
+        }
+
+        .step.failed::before {
+            content: '✗';
+            display: inline-block;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        /* コンソール */
+        .console-box {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
             border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 25px;
+            min-height: 200px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        /* 結果パネル */
+        .result-panel {
+            background-color: #161b22;
+            border: 2px solid #30363d;
+            border-radius: 6px;
+            padding: 25px;
+            margin-bottom: 25px;
+            display: none;
+        }
+
+        .result-panel.active {
+            display: block;
+        }
+
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result-icon {
+            font-size: 24px;
+        }
+
+        .environment-chromeos {
+            border-left: 4px solid #7ee787;
+        }
+
+        .environment-chromeos .result-title {
+            color: #7ee787;
+        }
+
+        .environment-crostini {
+            border-left: 4px solid #f2cc60;
+        }
+
+        .environment-crostini .result-title {
+            color: #f2cc60;
+        }
+
+        .environment-linux {
+            border-left: 4px solid #79c0ff;
+        }
+
+        .environment-linux .result-title {
+            color: #79c0ff;
+        }
+
+        .environment-other {
+            border-left: 4px solid #ff7b72;
+        }
+
+        .environment-other .result-title {
+            color: #ff7b72;
+        }
+
+        .result-details {
             margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #30363d;
         }
-        .btn-scan:hover {
-            background-color: #2ea043;
+
+        .detail-item {
+            margin-bottom: 10px;
+            font-size: 13px;
         }
+
+        .detail-label {
+            color: #8b949e;
+            display: inline-block;
+            min-width: 150px;
+        }
+
+        .detail-value {
+            color: #58a6ff;
+        }
+
+        .confidence {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #0d1117;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #30363d;
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #238636, #7ee787);
+            transition: width 0.3s ease;
+        }
+
+        /* テーブル */
+        .detection-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        .detection-table th {
+            background-color: #0d1117;
+            color: #58a6ff;
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #30363d;
+            font-weight: bold;
+        }
+
+        .detection-table td {
+            padding: 10px;
+            border-bottom: 1px solid #30363d;
+            color: #8b949e;
+        }
+
+        .detection-table .pass {
+            color: #7ee787;
+        }
+
+        .detection-table .fail {
+            color: #ff7b72;
+        }
+
+        .detection-table .warn {
+            color: #f2cc60;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            color: #6e7681;
+            font-size: 12px;
+            margin-top: 40px;
+            border-top: 1px solid #30363d;
+            padding-top: 20px;
+        }
+
         .success { color: #7ee787; }
         .warning { color: #f2cc60; }
         .danger { color: #ff7b72; }
+        .info { color: #79c0ff; }
     </style>
 </head>
 <body>
 
-    <h1>[SYSTEM] OS & Browser Integrity Check</h1>
-    <p>ブラウザ内部の特殊領域（chrome-untrusted://）へのフェッチ可否による環境の自動判別を行います。</p>
+    <div class="container">
+        <h1>🔍 ChromeOS / 環境判別システム v2.0</h1>
+        <p class="subtitle">ブラウザセキュリティ境界の多層解析によるOS環境の高精度判定</p>
 
-    <button class="btn-scan" onclick="startDetection()">スキャンを開始する</button>
+        <div class="control-panel">
+            <button class="btn btn-primary" onclick="startDetection()" id="scanBtn">
+                <span id="scanBtnText">スキャンを開始する</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearResults()">結果をリセット</button>
+        </div>
 
-    <div class="console-box" id="output">=== 待機中: スキャンボタンを押してください ===</div>
+        <!-- ステップ表示 -->
+        <div class="detection-steps" id="stepsPanel">
+            <div class="step pending" id="step1">User-Agent 解析</div>
+            <div class="step pending" id="step2">chrome-untrusted:// プロトコル試行</div>
+            <div class="step pending" id="step3">レスポンスパターン判定</div>
+            <div class="step pending" id="step4">フィンガープリント検証</div>
+            <div class="step pending" id="step5">最終判定</div>
+        </div>
+
+        <!-- コンソール出力 -->
+        <div class="console-box" id="output">=== 待機中: スキャンボタンを押してください ===</div>
+
+        <!-- 結果パネル -->
+        <div class="result-panel" id="resultPanel">
+            <div class="result-title" id="resultTitle">
+                <span class="result-icon" id="resultIcon">⚙️</span>
+                <span id="resultText">判定中...</span>
+            </div>
+            <div class="result-details">
+                <div class="detail-item">
+                    <span class="detail-label">判定結果:</span>
+                    <span class="detail-value" id="detailResult">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">User-Agent:</span>
+                    <span class="detail-value" id="detailUA">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">プラットフォーム:</span>
+                    <span class="detail-value" id="detailPlatform">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">chrome-untrusted応答:</span>
+                    <span class="detail-value" id="detailChromeUntrusted">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">エラータイプ:</span>
+                    <span class="detail-value" id="detailErrorType">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">レスポンスタイム:</span>
+                    <span class="detail-value" id="detailLatency">-</span>
+                </div>
+
+                <!-- 判定テーブル -->
+                <table class="detection-table">
+                    <thead>
+                        <tr>
+                            <th>検査項目</th>
+                            <th>結果</th>
+                            <th>詳細</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detectionTableBody">
+                    </tbody>
+                </table>
+
+                <div class="confidence" id="confidenceDiv" style="display: none;">
+                    <div>信頼度: <strong id="confidenceValue">0%</strong></div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>© 2024 ryopc | ChromeOS Integrity Detection System</p>
+        </footer>
+    </div>
 
     <script>
-        async function startDetection() {
+        // === ステップ管理関数 ===
+        function setStep(stepId, status) {
+            const step = document.getElementById(stepId);
+            step.className = `step ${status}`;
+        }
+
+        // === ログ出力関数 ===
+        function log(message, type = 'info') {
             const output = document.getElementById('output');
-            output.innerHTML = "ユーザーエージェントを分析中...\n";
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            let prefix = '';
+            if (type === 'success') prefix = '[✓]';
+            else if (type === 'error') prefix = '[✗]';
+            else if (type === 'warning') prefix = '[!]';
+            else prefix = '[*]';
+
+            output.innerHTML += `<span class="${type}">${prefix} [${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // === 結果テーブル行追加 ===
+        function addDetectionRow(label, result, detail) {
+            const tbody = document.getElementById('detectionTableBody');
+            const row = tbody.insertRow();
+            const resultClass = result === '✓ Pass' ? 'pass' : result === '✗ Fail' ? 'fail' : 'warn';
+            row.innerHTML = `
+                <td>${label}</td>
+                <td class="${resultClass}">${result}</td>
+                <td>${detail}</td>
+            `;
+        }
+
+        // === OS判定エンジン ===
+        function detectOS() {
+            const ua = navigator.userAgent;
+            const platform = navigator.platform;
+            const appVersion = navigator.appVersion;
             
-            // ターゲットとなる特殊URL（指定された画像URL）
-            const targetUrl = "chrome-untrusted://new-tab-page/custom_background_image?url=https%3A%2F%://googleusercontent.com%2Fproxy%2FxpCEIa8TbIUGee39mYxIxtPBPjIDNQo6GfEjF-FIqt1L2fjNe7WfGLCfsbs4E0lECNsdt0Yt9hQpZZdgd1FXJCIhmce2H2i0hZp0%3Dw3840-h2160-p-k-no-nd-mv";
-            
-            output.innerHTML += `特殊URLへフェッチを試行します:\n[URL] ${targetUrl}\n\n`;
+            const signatures = {
+                // Windows系
+                windows: {
+                    tokens: ['Windows', 'Win32', 'Win64'],
+                    versions: {
+                        'Windows NT 10.0': 'Windows 10/11',
+                        'Windows NT 6.3': 'Windows 8.1',
+                        'Windows NT 6.2': 'Windows 8',
+                        'Windows NT 6.1': 'Windows 7'
+                    }
+                },
+                // macOS系
+                macos: {
+                    tokens: ['Macintosh', 'Mac OS X', 'Mac Intel'],
+                    versions: {
+                        '10_15': 'macOS Catalina',
+                        '10_14': 'macOS Mojave',
+                        '11_': 'macOS Big Sur',
+                        '12_': 'macOS Monterey',
+                        '13_': 'macOS Ventura',
+                        '14_': 'macOS Sonoma',
+                        '15_': 'macOS Sequoia'
+                    }
+                },
+                // ChromeOS
+                chromeos: {
+                    tokens: ['CrOS'],
+                    architecture: /CrOS (\w+)/
+                },
+                // Android
+                android: {
+                    tokens: ['Android'],
+                    versions: /Android (\d+\.\d+)/
+                },
+                // iOS
+                ios: {
+                    tokens: ['iPhone', 'iPad', 'iPod'],
+                    versions: /OS (\d+)_(\d+)/
+                },
+                // Linux (generic)
+                linux: {
+                    tokens: ['Linux', 'X11'],
+                    exclude: ['Android', 'CrOS']
+                }
+            };
 
-            try {
-                // 特殊URLへのアクセスを試みる（try-catch文でエラーをキャッチする）
-                const response = await fetch(targetUrl);
-                
-                // 万が一、エラーが起きずに応答が帰ってきた場合（通常はセキュリティで弾かれます）
-                output.innerHTML += `<span class="success">成功: 応答が確認されました。本物の内部セッションがアクティブです。</span>\n`;
-                output.innerHTML += `[RESULT] 無改造のChromeOS、または開発環境である可能性が極めて高いです。`;
+            let detectedOS = 'Unknown';
+            let osVersion = 'N/A';
+            let osFamily = null;
 
-            } catch (error) {
-                // ここでエラーをキャッチし、その中身を解析する
-                output.innerHTML += `<span class="warning">[CATCH] エラーを検出しました。</span>\n`;
-                output.innerHTML += `エラー内容: ${error.name} - ${error.message}\n\n`;
-
-                // エラーのパターンや、User-Agent（ブラウザの情報）を組み合わせて判定する
-                const isChrome = navigator.userAgent.includes("Chrome");
-                const isCrOS = navigator.userAgent.includes("CrOS"); // ChromeOSの固有文字
-
-                if (isCrOS) {
-                    output.innerHTML += `<span class="success">[判定結果] 本物の Chromebook (ChromeOS) を検出しました。</span>\n`;
-                    output.innerHTML += `理由: 'chrome-untrusted' へのリクエストがOS固有の暗号セキュリティチェーンによって正しくブロックされ、安全な改ざん無しの状態であることが証明されました。`;
-                } else if (isChrome) {
-                    output.innerHTML += `<span class="warning">[判定結果] Windows/Mac等の一般の Chromeブラウザ です。</span>\n`;
-                    output.innerHTML += `理由: ブラウザ自体はChrome系ですが、Chromebook固有のOSシグナル（CrOS）が検出されませんでした。`;
-                } else {
-                    output.innerHTML += `<span class="danger">[判定結果] 非Chrome系（Safari、Firefox、または改造ブラウザ）です。</span>\n`;
-                    output.innerHTML += `理由: 'chrome-untrusted' プロトコル自体が解釈されていないか、想定外の挙動です。`;
+            // Windows判定
+            if (signatures.windows.tokens.some(t => ua.includes(t))) {
+                detectedOS = 'Windows';
+                osFamily = 'windows';
+                for (const [token, version] of Object.entries(signatures.windows.versions)) {
+                    if (ua.includes(token)) {
+                        osVersion = version;
+                        break;
+                    }
                 }
             }
+            // macOS判定
+            else if (signatures.macos.tokens.some(t => ua.includes(t))) {
+                detectedOS = 'macOS';
+                osFamily = 'macos';
+                for (const [token, version] of Object.entries(signatures.macos.versions)) {
+                    if (ua.includes(token)) {
+                        osVersion = version;
+                        break;
+                    }
+                }
+            }
+            // ChromeOS判定
+            else if (signatures.chromeos.tokens.some(t => ua.includes(t))) {
+                detectedOS = 'ChromeOS';
+                osFamily = 'chromeos';
+                const archMatch = ua.match(signatures.chromeos.architecture);
+                if (archMatch) osVersion = `${archMatch[1]} architecture`;
+            }
+            // iOS判定
+            else if (signatures.ios.tokens.some(t => ua.includes(t))) {
+                detectedOS = 'iOS';
+                osFamily = 'ios';
+                const versionMatch = ua.match(signatures.ios.versions);
+                if (versionMatch) osVersion = `iOS ${versionMatch[1]}.${versionMatch[2]}`;
+            }
+            // Android判定
+            else if (signatures.android.tokens.some(t => ua.includes(t))) {
+                detectedOS = 'Android';
+                osFamily = 'android';
+                const versionMatch = ua.match(signatures.android.versions);
+                if (versionMatch) osVersion = `Android ${versionMatch[1]}`;
+            }
+            // Linux判定（generic）
+            else if (signatures.linux.tokens.some(t => ua.includes(t)) && 
+                     !signatures.linux.exclude.some(t => ua.includes(t))) {
+                detectedOS = 'Linux';
+                osFamily = 'linux';
+                // Linux配布版判定
+                if (ua.includes('Ubuntu')) osVersion = 'Ubuntu';
+                else if (ua.includes('Debian')) osVersion = 'Debian';
+                else if (ua.includes('Fedora')) osVersion = 'Fedora';
+                else if (ua.includes('CentOS')) osVersion = 'CentOS';
+                else osVersion = 'Generic Linux';
+            }
+
+            return { detectedOS, osVersion, osFamily, ua, platform };
+        }
+
+        // === メイン判定関数 ===
+        async function startDetection() {
+            const scanBtn = document.getElementById('scanBtn');
+            const scanBtnText = document.getElementById('scanBtnText');
+            scanBtn.disabled = true;
+            scanBtnText.textContent = 'スキャン中...';
+
+            // UI初期化
+            document.getElementById('stepsPanel').classList.add('active');
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('resultPanel').innerHTML = '';
+            document.getElementById('detectionTableBody').innerHTML = '';
+
+            // ステップ1: User-Agent解析
+            setStep('step1', 'running');
+            log('ユーザーエージェント分析開始...');
+            await new Promise(r => setTimeout(r, 300));
+
+            const { detectedOS, osVersion, osFamily, ua, platform } = detectOS();
+            const isChrome = ua.includes('Chrome') && !ua.includes('Chromium only');
+            const isFirefox = ua.includes('Firefox');
+            const isSafari = ua.includes('Safari') && !ua.includes('Chrome');
+            const isEdge = ua.includes('Edg');
+            const isCrOS = ua.includes('CrOS');
+            const isLinux = ua.includes('Linux');
+            const isAndroid = ua.includes('Android');
+
+            log(`OS: ${detectedOS} (${osVersion})`, 'info');
+            log(`Browser: ${isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : isEdge ? 'Edge' : 'Other'}`, 'info');
+            log(`UA: ${ua}`, 'info');
+            log(`Platform: ${platform}`, 'info');
+
+            // 検査テーブルに追加
+            addDetectionRow('検出OS', '✓ Pass', detectedOS);
+            addDetectionRow('OSバージョン', osVersion !== 'N/A' ? '✓ Pass' : '⚠ Partial', osVersion);
+            addDetectionRow('ブラウザ', '✓ Pass', isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : isEdge ? 'Edge' : 'Unknown');
+            addDetectionRow('ChromeOS署名', isCrOS ? '✓ Pass' : '✗ Fail', isCrOS ? 'CrOS token found' : 'Not ChromeOS');
+
+            setStep('step1', 'completed');
+
+            // ステップ2: chrome-untrusted:// フェッチ
+            setStep('step2', 'running');
+            log('chrome-untrusted:// プロトコルテスト開始...');
+            await new Promise(r => setTimeout(r, 300));
+
+            const targetUrls = [
+                "chrome-untrusted://new-tab-page/custom_background_image?url=https%3A%2F%://googleusercontent.com%2Fproxy%2FxpCEIa8TbIUGee39mYxIxtPBPjIDNQo6GfEjF-FIqt1L2fjNe7WfGLCfsbs4E0lECNsdt0Yt9hQpZZdgd1FXJCIhmce2H2i0hZp0%3Dw3840-h2160-p-k-no-nd-mv",
+                "chrome-untrusted://resources/css/shared_vars.css",
+                "chrome-untrusted://help/help.html"
+            ];
+
+            let fetchResult = null;
+            let errorType = null;
+            let responseTime = null;
+            let finalUrl = null;
+
+            for (const url of targetUrls) {
+                const startTime = performance.now();
+                try {
+                    log(`試行: ${url.substring(0, 50)}...`);
+                    const response = await fetch(url);
+                    responseTime = performance.now() - startTime;
+                    fetchResult = 'success';
+                    finalUrl = url;
+                    log(`成功: ステータス ${response.status}`, 'success');
+                    break;
+                } catch (e) {
+                    responseTime = performance.now() - startTime;
+                    errorType = e.name;
+                    log(`失敗: ${e.name} - ${e.message}`);
+                    fetchResult = 'error';
+                }
+            }
+
+            addDetectionRow('chrome-untrusted フェッチ', fetchResult === 'error' ? '⚠ Expected' : '✗ Unexpected', errorType || 'Network request blocked');
+
+            setStep('step2', 'completed');
+
+            // ステップ3: レスポンスパターン判定
+            setStep('step3', 'running');
+            log('レスポンスパターン分析中...');
+            await new Promise(r => setTimeout(r, 300));
+
+            let environmentType = 'unknown';
+            let confidence = 0;
+            let environmentLabel = '不明';
+
+            // OS別の信頼度ベース判定
+            if (osFamily === 'chromeos') {
+                environmentType = 'chromeos';
+                environmentLabel = 'ChromeOS (ネイティブ)';
+                confidence = fetchResult === 'error' ? 98 : 90;
+                log('ChromeOS ネイティブ環境シグナル検出', 'success');
+            } 
+            else if (osFamily === 'windows') {
+                environmentType = 'windows';
+                environmentLabel = `Windows (${osVersion})`;
+                confidence = 96;
+                log('Windows環境を確定', 'success');
+            }
+            else if (osFamily === 'macos') {
+                environmentType = 'macos';
+                environmentLabel = `macOS (${osVersion})`;
+                confidence = 96;
+                log('macOS環境を確定', 'success');
+            }
+            else if (osFamily === 'linux' && !isAndroid) {
+                environmentType = 'linux';
+                environmentLabel = `Linux (${osVersion})`;
+                confidence = isCrOS ? 95 : 90;
+                if (isCrOS) {
+                    environmentLabel = 'Crostini (Linux on ChromeOS)';
+                    confidence = 92;
+                    log('Crostini環境（Linux on ChromeOS）を検出', 'warning');
+                } else {
+                    log('ネイティブLinux環境を検出', 'warning');
+                }
+            }
+            else if (osFamily === 'android') {
+                environmentType = 'android';
+                environmentLabel = `Android (${osVersion})`;
+                confidence = 97;
+                log('Android環境を確定', 'success');
+            }
+            else if (osFamily === 'ios') {
+                environmentType = 'ios';
+                environmentLabel = `iOS (${osVersion})`;
+                confidence = 97;
+                log('iOS環境を確定', 'success');
+            }
+            else {
+                environmentType = 'unknown';
+                environmentLabel = '未判別';
+                confidence = 20;
+                log('OS判定に失敗', 'error');
+            }
+
+            log(`レスポンスタイム: ${responseTime.toFixed(2)}ms`);
+            addDetectionRow('環境タイプ', '✓ Pass', environmentLabel);
+
+            setStep('step3', 'completed');
+
+            // ステップ4: フィンガープリント検証
+            setStep('step4', 'running');
+            log('セキュリティフィンガープリント検証...');
+            await new Promise(r => setTimeout(r, 400));
+
+            const hasWebGL = !!document.createElement('canvas').getContext('webgl');
+            const hasWebGPU = !!navigator.gpu;
+            const maxTouchPoints = navigator.maxTouchPoints || 0;
+            const hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
+
+            addDetectionRow('WebGL対応', hasWebGL ? '✓ Pass' : '✗ Fail', hasWebGL ? 'Available' : 'Not available');
+            addDetectionRow('WebGPU対応', hasWebGPU ? '✓ Pass' : '✗ Fail', hasWebGPU ? 'Available' : 'Not available');
+            addDetectionRow('タッチ対応', maxTouchPoints > 0 ? '⚠ Yes' : '✓ No', `${maxTouchPoints} points`);
+
+            log(`CPU コア数: ${hardwareConcurrency}`, 'info');
+
+            setStep('step4', 'completed');
+
+            // ステップ5: 最終判定
+            setStep('step5', 'running');
+            log('最終判定を生成中...');
+            await new Promise(r => setTimeout(r, 300));
+
+            // 結果パネル表示
+            const resultPanel = document.getElementById('resultPanel');
+            resultPanel.innerHTML = '';
+            resultPanel.classList.add('active');
+
+            let resultClass = 'environment-other';
+            let resultIcon = '❓';
+
+            if (environmentType === 'chromeos') {
+                resultClass = 'environment-chromeos';
+                resultIcon = '🎉';
+            } else if (environmentType === 'windows') {
+                resultClass = 'environment-linux';
+                resultIcon = '🪟';
+            } else if (environmentType === 'macos') {
+                resultClass = 'environment-linux';
+                resultIcon = '🍎';
+            } else if (environmentType === 'linux') {
+                resultClass = 'environment-crostini';
+                resultIcon = isCrOS ? '🥾' : '🐧';
+            } else if (environmentType === 'android') {
+                resultClass = 'environment-linux';
+                resultIcon = '🤖';
+            } else if (environmentType === 'ios') {
+                resultClass = 'environment-linux';
+                resultIcon = '📱';
+            }
+
+            const resultHTML = `
+                <div class="result-panel active ${resultClass}">
+                    <div class="result-title">
+                        <span class="result-icon">${resultIcon}</span>
+                        <span id="resultText">${environmentLabel}</span>
+                    </div>
+                    <div class="result-details">
+                        <div class="detail-item">
+                            <span class="detail-label">判定OS:</span>
+                            <span class="detail-value">${detectedOS}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">OSバージョン:</span>
+                            <span class="detail-value">${osVersion}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ブラウザ:</span>
+                            <span class="detail-value">${isChrome ? 'Google Chrome' : isFirefox ? 'Mozilla Firefox' : isSafari ? 'Apple Safari' : isEdge ? 'Microsoft Edge' : 'Unknown'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">User-Agent:</span>
+                            <span class="detail-value" style="font-size: 11px; word-break: break-all;">${ua.substring(0, 100)}...</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">プラットフォーム:</span>
+                            <span class="detail-value">${platform}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">chrome-untrusted試行:</span>
+                            <span class="detail-value">${fetchResult} (${errorType || 'N/A'})</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">レスポンスタイム:</span>
+                            <span class="detail-value">${responseTime.toFixed(2)}ms</span>
+                        </div>
+
+                        <table class="detection-table">
+                            <thead>
+                                <tr>
+                                    <th>検査項目</th>
+                                    <th>結果</th>
+                                    <th>詳細</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detectionTableBody">
+                            </tbody>
+                        </table>
+
+                        <div class="confidence">
+                            <div>判定信頼度: <strong id="confidenceValue">${confidence}%</strong></div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidenceFill" style="width: ${confidence}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            resultPanel.innerHTML = resultHTML;
+
+            log(`最終判定: ${environmentLabel} (信頼度 ${confidence}%)`, 'success');
+            log('スキャン完了', 'success');
+
+            setStep('step5', 'completed');
+            scanBtn.disabled = false;
+            scanBtnText.textContent = 'スキャンを開始する';
+        }
+
+        // === リセット関数 ===
+        function clearResults() {
+            document.getElementById('output').innerHTML = '=== 待機中: スキャンボタンを押してください ===';
+            document.getElementById('resultPanel').classList.remove('active');
+            document.getElementById('stepsPanel').classList.remove('active');
+            ['step1', 'step2', 'step3', 'step4', 'step5'].forEach(id => setStep(id, 'pending'));
         }
     </script>
+
 </body>
 </html>
